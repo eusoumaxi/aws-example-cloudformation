@@ -1,0 +1,168 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "scalability group",
+    "Parameters": {
+        "IdImage": {
+            "Type": "String",
+            "Description": "image para la intancia => ami-09d95fab7fff3776c",
+            "AllowedValues": [
+                "ami-09d95fab7fff3776c",
+                "ami-02b5d851009884e20"
+            ]
+        },
+        "IntanceType": {
+            "Type": "String",
+            "Description": "type of Intance",
+            "AllowedValues": [
+                "t2.micro",
+                "t2.small"
+            ],
+            "Default": "t2.micro"
+        },
+        "NumberOfIntances": {
+            "Type": "String",
+            "Description": "Nomber of Intances",
+            "AllowedValues": [
+                "1",
+                "2"
+            ],
+            "Default": "1"
+        },
+        "KeysPairs": {
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Description": "Par de claves",
+            "AllowedPattern": ".+",
+            "ConstraintDescription": "Required"
+        },
+        "AvailabilityZone": {
+            "Type": "String",
+            "Description": "availability zone",
+            "AllowedPattern": ".+",
+            "ConstraintDescription": "Required",
+            "Default": "us-east-1c"
+        }
+    },
+    "Resources": {
+        "LaunchConfig": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "config": {
+                        "packages": {
+                            "yum": {
+                                "httpd": []
+                            }
+                        },
+                        "services": {
+                            "sysvinit": {
+                                "httpd": {
+                                    "enabled": "true",
+                                    "ensureRunning": "true"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "ImageId": {
+                    "Ref": "IdImage"
+                },
+                "InstanceType": {
+                    "Ref": "IntanceType"
+                },
+                "KeyName": {
+                    "Ref": "KeysPairs"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                "# Install the files and packages from the metadata\n",
+                                "/opt/aws/bin/cfn-init -v ",
+                                "         --stack ",
+                                {
+                                    "Ref": "AWS::StackName"
+                                },
+                                "         --resource LaunchConfig",
+                                "         --region ",
+                                {
+                                    "Ref": "AWS::Region"
+                                },
+                                "\n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "GroupsEscalado": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "AvailabilityZones": [
+                    {
+                        "Ref": "AvailabilityZone"
+                    }
+                ],
+                "LaunchConfigurationName": {
+                    "Ref": "LaunchConfig"
+                },
+                "MinSize": {
+                    "Ref": "NumberOfIntances"
+                },
+                "MaxSize": {
+                    "Ref": "NumberOfIntances"
+                },
+                "LoadBalancerNames": [
+                    {
+                        "Ref": "Balanceador"
+                    }
+                ]
+            }
+        },
+        "Balanceador": {
+            "Type": "AWS::ElasticLoadBalancing::LoadBalancer",
+            "Properties": {
+                "AvailabilityZones": [
+                    {
+                        "Ref": "AvailabilityZone"
+                    }
+                ],
+                "Listeners": [
+                    {
+                        "LoadBalancerPort": "80",
+                        "InstancePort": "80",
+                        "Protocol": "TCP",
+                        "InstanceProtocol": "TCP"
+                    }
+                ],
+                "HealthCheck": {
+                    "Target": "TCP:80",
+                    "HealthyThreshold": "2",
+                    "UnhealthyThreshold": "2",
+                    "Interval": "10",
+                    "Timeout": "5"
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "URLBalanceador": {
+            "Description": "Balanceador",
+            "Value": {
+                "Fn::Join": [
+                    "",
+                    [
+                        "http://",
+                        "Fn::GetAtt": [
+                            "Balanceador",
+                            "DNSName"
+                        ]
+                    ]
+                ]
+            }
+        }
+    }
+}

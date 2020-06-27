@@ -1,0 +1,26 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "my instance",
+    
+    "Resources": {
+        "MyInstance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "ImageId": "ami-09d95fab7fff3776c",
+                "InstanceType": "t2.micro",
+                "KeyName": "instance"
+            }
+        }
+    },
+    "Outputs": {
+        "IpPublica": {
+            "Description": "IP public",
+            "Value": {
+                "Fn::GetAtt": [
+                    "MyInstance",
+                    "PublicIp"
+                ]
+            }
+        }
+    }
+}
